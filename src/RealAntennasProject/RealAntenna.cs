@@ -41,7 +41,9 @@ namespace RealAntennas
 
         public ModuleRealAntenna Parent { get; internal set; }
         public CommNet.CommNode ParentNode { get; set; }
-        public Vector3 Position => ParentNode.position;
+        public Vector3d Position => PrecisePosition;
+        public Vector3d PrecisePosition => ParentNode.precisePosition;
+        public Vector3d TransformPosition => ParentNode.position;
         public virtual AntennaShape Shape => Gain <= MaxOmniGain ? AntennaShape.Omni : AntennaShape.Dish;
         public virtual bool CanTarget => Shape != AntennaShape.Omni && (ParentNode == null || !ParentNode.isHome);
         public Vector3 ToTarget {
@@ -50,6 +52,16 @@ namespace RealAntennas
                 return (Target is Vessel v) ? v.transform.position - Position : (Vector3)(Target as CelestialBody).position - Position;
             }
         }
+
+        public Vector3 ToTargetByTransform
+        {
+            get
+            {
+                if (!(CanTarget && Target != null)) return Vector3.zero;
+                return (Target is Vessel v) ? v.transform.position - TransformPosition : (Vector3)(Target as CelestialBody).position - TransformPosition;
+            }
+        }
+
         public string TargetID { get; set; }
         private ITargetable _target = null;
         public ITargetable Target
@@ -65,6 +77,8 @@ namespace RealAntennas
         }
 
         public double PowerDraw => RATools.LogScale(PowerDrawLinear);
+//        public virtual double IdlePowerDraw => PowerDrawLinear * 1e-6 * ModuleRealAntenna.InactivePowerConsumptionMult;
+        public virtual double IdlePowerDraw => TechLevelInfo.BasePower / 1000;    // Base power in W, 1ec/s = 1kW
         public virtual double PowerDrawLinear => RATools.LinearScale(TxPower) / PowerEfficiency;
         public virtual double MinimumDistance => (CanTarget && Beamwidth < 90 ? minimumSpotRadius / Math.Tan(Beamwidth) : 0);
 
@@ -100,6 +114,8 @@ namespace RealAntennas
         }
 
         public virtual bool Compatible(RealAntenna other) => RFBand == other.RFBand;
+        public virtual bool DirectionCheck(RealAntenna other) => DirectionCheck(other.Position);
+        public virtual bool DirectionCheck(Vector3 pos) => Physics.PointingLoss(this, pos) < Physics.MaxPointingLoss;
 
         public virtual double BestDataRateToPeer(RealAntenna rx)
         {
@@ -110,6 +126,7 @@ namespace RealAntennas
             if ((tx.Parent is ModuleRealAntenna) && !tx.Parent.CanComm()) return 0;
             if ((rx.Parent is ModuleRealAntenna) && !rx.Parent.CanComm()) return 0;
             if ((distance < tx.MinimumDistance) || (distance < rx.MinimumDistance)) return 0;
+            if (!(tx.DirectionCheck(rx) && rx.DirectionCheck(tx))) return 0;
 
             double RSSI = Physics.ReceivedPower(tx, rx, distance, tx.Frequency);
             double temp = Physics.NoiseTemperature(rx, toSource);

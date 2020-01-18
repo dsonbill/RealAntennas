@@ -1,4 +1,5 @@
 ﻿using CommNet;
+using System.Reflection;
 using UnityEngine;
 
 namespace RealAntennas
@@ -11,16 +12,22 @@ namespace RealAntennas
         public static bool Enabled => true;
         public static bool debugWalkLogging = true;
         public static float debugWalkInterval = 60;
+        public Metrics metrics = new Metrics();
+        public static Assembly assembly;
+        public static System.Diagnostics.FileVersionInfo info;
 
         public Network.RACommNetNetwork Network { get => network; }
+        public MapUI.RACommNetUI UI { get => ui as MapUI.RACommNetUI; }
         private Network.RACommNetNetwork network = null;
         private CommNetUI ui;
 
         protected override void Start()
         {
             Debug.LogFormat($"{ModTag} Start in {HighLogic.LoadedScene}");
+            assembly = Assembly.GetExecutingAssembly();
+            info = System.Diagnostics.FileVersionInfo.GetVersionInfo(assembly.Location);
             Initialize();
-            ui = gameObject.AddComponent<Network.RACommNetUI>();
+            ui = gameObject.AddComponent<MapUI.RACommNetUI>();
             this.network = gameObject.AddComponent<Network.RACommNetNetwork>();
             CommNetScenario.RangeModel = RangeModel;
 
@@ -44,6 +51,8 @@ namespace RealAntennas
                     Debug.LogFormat($"{ModTag} Ignore CommNetScenario ERR immediately following this.");
                 }
             }
+            if (!CommNetEnabled)
+                ScreenMessages.PostScreenMessage("RealAntennas: CommNet Disabled in Difficulty Settings", 8, ScreenMessageStyle.UPPER_CENTER, Color.yellow);
             base.OnAwake();     // Will set CommNetScenario.Instance to this
         }
 
